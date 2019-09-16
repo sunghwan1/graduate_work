@@ -4,36 +4,33 @@ import pytesseract
 import time
 from PIL import Image
 
-# --Read Input Image-- 이미지 로드
+# --Read Input Image-- (이미지 불러오기)
 
-src = cv2.imread("88888888.jpg", cv2.IMREAD_COLOR)
+src = cv2.imread("987987987.jpg", cv2.IMREAD_COLOR) # 이미지 불러오기
 
-#dst = src.copy()
-#dst = src[480:960, 50:670]
+'''
+dst = src.copy()           #이미지영역을 반으로 자르기(번호판 인식률 속도를 높이기 위함)
+dst = src[480:960, 50:670]
 
-#cv2.imshow("half img", dst)
-#cv2.waitKey(0)
+cv2.imshow("half img", dst)
+cv2.waitKey(0)
+'''
 
-img_ori = src #이미지 불러오기
+prevtime = time.time() # 걸린 시간 체크하는 함수
 
-prevtime = time.time() # 걸린 시간 체크하는 메서드
+# 변수 선언
+height, width, channel = src.shape # 이미지에 대한 값을 가질 변수
 
-height, width, channel = img_ori.shape #변수 선언
+numcheck = 0 # 반복문에서 번호판 문자열 검사할 변수
+charsok = 0 # 반복문에서 번호판 글자를 제대로 읽었는지 검사할 변수
+add_w_padding, add_h_padding = 0, 0 # 추가할 padding값을 가질 변수
+w_padding_max, h_padding_max = 0, 0 # 일정한 padding값을 가지게되었을때 반복문을 제어할 변수
 
-numcheck = 0 # 번호판 문자열 검사할 변수
-charsok = 0 # 번호판 글자를 제대로 읽었는지에 대해 반복문을 결정할 변수
-add_w_padding, add_h_padding = 0, 0
-w_padding_max, h_padding_max = 0, 0
+# --Convert Image to Grayscale-- (이미지 흑백변환)
 
-# --Convert Image to Grayscale--
+gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY) # 이미지 흑백변환
 
-# hsv = cv2.cvtColor(img_ori, cv2.COLOR_BGR2HSV)
-# gray = hsv[:,:,2]
-gray = cv2.cvtColor(img_ori, cv2.COLOR_BGR2GRAY) #이미지 흑백변환
-
-cv2.imwrite('01.jpg', gray) #흑백 이미지 저장
-
-# --Maximize Contrast(Optional)--
+# --Maximize Contrast(Optional)-- (흑백대비 최대화)
 
 structuringElement = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
 
@@ -43,13 +40,11 @@ imgBlackHat = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, structuringElement)
 imgGrayscalePlusTopHat = cv2.add(gray, imgTopHat)
 gray = cv2.subtract(imgGrayscalePlusTopHat, imgBlackHat)
 
-cv2.imwrite('02.jpg', gray) #Maximize Contrast(Optional)
+# --Adaptive Thresholding-- (가우시안블러(이미지 노이즈 제거) 및 쓰레시 홀딩)
 
-# --Adaptive Thresholding--
+img_blurred = cv2.GaussianBlur(gray, ksize=(5, 5), sigmaX=0) # GaussianBlur 적용
 
-img_blurred = cv2.GaussianBlur(gray, ksize=(5, 5), sigmaX=0)
-
-img_thresh = cv2.adaptiveThreshold(
+img_thresh = cv2.adaptiveThreshold( # adaptiveThreshold 적용
     img_blurred,
     maxValue=255.0,
     adaptiveMethod=cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -58,34 +53,32 @@ img_thresh = cv2.adaptiveThreshold(
     C=9
 )
 
-cv2.imwrite('03.jpg', img_thresh) #쓰레시홀딩 적용 이미지 저장
+# --Find Contours-- (윤곽선 찾기)
 
-# --Find Contours--
-
-contours, hierarchy = cv2.findContours(
+contours, hierarchy = cv2.findContours( # opencv의 findContours를 이용하여 contours에 저장
     img_thresh,
     cv2.RETR_LIST,
     cv2.CHAIN_APPROX_SIMPLE
 )
 
-temp_result = np.zeros((height, width, channel), dtype=np.uint8)
+temp_result = np.zeros((height, width, channel), dtype=np.uint8) # numpy.zeros를 이용하여 윤곽선 범위 저장
 
-cv2.drawContours(temp_result, contours, -1, (255, 255, 255))
+cv2.drawContours(temp_result, contours, -1, (255, 255, 255)) # 윤곽선 그리기
 
-cv2.imwrite('04.jpg', temp_result) #Contours 찾기
 
-# --Prepare Data--
+# --Prepare Data-- (데이터 비교하기, 글자영역으로 추정되는 rectangle 그리기)
 
-temp_result = np.zeros((height, width, channel), dtype=np.uint8)
+temp_result = np.zeros((height, width, channel), dtype=np.uint8) # drawContours를 이용해 그린 윤곽선에 다시 numpy.zeros를 이용해 다시 윤곽선 범위 저장 (안하면 윤곽선 좀 남아있음)
 
-contours_dict = []
+
+contours_dict = [] # contour 정보를 모두 저장받을 리스트 변수
 
 for contour in contours:
-    x, y, w, h = cv2.boundingRect(contour)
-    cv2.rectangle(temp_result, pt1=(x, y), pt2=(x + w, y + h), color=(255, 255, 255), thickness=2)
+    x, y, w, h = cv2.boundingRect(contour) # 위치 높낮이 데이터 정보 저장
+    cv2.rectangle(temp_result, pt1=(x, y), pt2=(x + w, y + h), color=(255, 255, 255), thickness=2) # 윤곽선을 감싸는 사각형 구하기
 
     # insert to dict
-    contours_dict.append({
+    contours_dict.append({ # contour 정보를 모두 저장
         'contour': contour,
         'x': x,
         'y': y,
@@ -95,18 +88,16 @@ for contour in contours:
         'cy': y + (h / 2)
     })
 
-cv2.imwrite('05.jpg', temp_result) #데이터 비교(네모영역찾기)
+# --Select Candidates by Char Size-- (글자 같은 영역 찾기)
 
-# --Select Candidates by Char Size--
+MIN_AREA = 80 # 윤곽선의 가운데 렉트 최소 넓이 80
+MIN_WIDTH, MIN_HEIGHT = 2, 8 # 바운드 렉트의 최소 너비와 높이는 2, 8
+MIN_RATIO, MAX_RATIO = 0.25, 1.0 # 바운드 렉트의 비율 가로 대비 세로 비율 최솟값 0.25, 최댓값 1.0
 
-MIN_AREA = 80
-MIN_WIDTH, MIN_HEIGHT = 2, 8
-MIN_RATIO, MAX_RATIO = 0.25, 1.0
+possible_contours = [] # 글자로 예상되는 contour들을 저장받을 리스트 변수
 
-possible_contours = []
-
-cnt = 0
-for d in contours_dict:
+cnt = 0 # count 변수
+for d in contours_dict: # contours_dict에 저장된 것을 조건에 맞다면 possible_contours에 append
     area = d['w'] * d['h']
     ratio = d['w'] / d['h']
 
@@ -123,18 +114,16 @@ temp_result = np.zeros((height, width, channel), dtype=np.uint8)
 for d in possible_contours:
     #     cv2.drawContours(temp_result, d['contour'], -1, (255, 255, 255))
     cv2.rectangle(temp_result, pt1=(d['x'], d['y']), pt2=(d['x'] + d['w'], d['y'] + d['h']), color=(255, 255, 255),
-                  thickness=2)
+                  thickness=2) # 글자로 예상되는 영역만 rectangle 그리기
 
-cv2.imwrite('06.jpg', temp_result) #contours영역 시각화
+# --Select Candidates by Arrangement of Contours-- (글자의 연속성(번호판으로 예상되는 영역) 찾기)
 
-# --Select Candidates by Arrangement of Contours--
-
-MAX_DIAG_MULTIPLYER = 4.7  # 5
-MAX_ANGLE_DIFF = 13  # 12.0
-MAX_AREA_DIFF = 0.5  # 0.5
-MAX_WIDTH_DIFF = 0.8 # 0.8
-MAX_HEIGHT_DIFF = 0.2 # 0.2
-MIN_N_MATCHED = 4  # 3
+MAX_DIAG_MULTIPLYER = 4.7  # 5 contour와 contour의 사이의 길이 (값계속 바꿔가면서 테스트 해야함)
+MAX_ANGLE_DIFF = 13  # 12.0 첫번째 contour와 두번째 contour의 직각 삼각형의 앵글 세타각도
+MAX_AREA_DIFF = 0.5  # 0.5  면적의 차이
+MAX_WIDTH_DIFF = 0.8 # 0.8 contour 간의 가로길이 차이
+MAX_HEIGHT_DIFF = 0.2 # 0.2 contour 간의 세로길이 차이
+MIN_N_MATCHED = 4  # 3 글자영역으로 예측된 것의 최소 갯수 (ex 3개이상이면 번호판일 것)
 
 
 def find_chars(contour_list):
@@ -358,8 +347,6 @@ while charsok == 0:
 
     info = plate_infos[longest_idx]
     chars = plate_chars[longest_idx]
-    print("값")
-    print(chars)
 
     for n in range(len(chars)):
         if len(chars) < 7:
@@ -373,7 +360,7 @@ while charsok == 0:
             chars = chars[0:(chars.__len__()-1)]
 
     print("걸린시간 %0.1f" %sec)
-    img_out = img_ori.copy()
+    img_out = src.copy()
 
     for j in range(len(chars)):
         if len(chars) < 7:
@@ -418,3 +405,5 @@ cv2.rectangle(img_out, pt1=(info['x'], info['y']), pt2=(info['x'] + info['w'], i
               color=(255, 0, 0), thickness=2)
 
 cv2.imwrite('010.jpg', img_out) #원본 이미지에서 번호판 영역 추출한 사진
+cv2.imshow('result', img_out)
+cv2.waitKey(0)
