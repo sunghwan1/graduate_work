@@ -6,7 +6,7 @@ from PIL import Image
 
 # --Read Input Image-- (이미지 불러오기)
 
-src = cv2.imread("9999.jpg", cv2.IMREAD_COLOR) # 이미지 불러오기
+src = cv2.imread("101.jpg", cv2.IMREAD_COLOR) # 이미지 불러오기
 
 '''
 dst = src.copy()           #이미지영역을 반으로 자르기(번호판 인식률 속도를 높이기 위함)
@@ -255,9 +255,7 @@ while charsok == 0: # 번호판 글자로 예상되는 값이 나올 때까지 �
             'h': int(plate_height)
         })
 
-    cv2.imwrite('08.jpg', img_cropped) #사진 돌려서 각도 맞추기(Rotate)
-
-    # --Another Thresholding to Find Chars--
+    # --Another Thresholding to Find Chars-- (찾은문자에서 다시 쓰레시홀딩)
 
     for i, plate_img in enumerate(plate_imgs):
         if numcheck > 3: # 예상되는 번호판 영역에서 문자열을 검사해 숫자 3개가 넘는다면(번호판일 확률이 높다면)
@@ -300,8 +298,6 @@ while charsok == 0: # 번호판 글자로 예상되는 값이 나올 때까지 �
         cv2.imwrite('00.jpg', img_result)
         chars = pytesseract.image_to_string(Image.open('00.jpg'), config='--psm 7 --oem 0', lang='kor') # 저장한 이미지를 불러 pytesseract로 읽음
         nowtime = time.time()
-        sec = nowtime - prevtime
-        print("걸린시간 %0.5f" % sec)
         print("이미지 불러 온 후 글자 : " + chars)
 
         result_chars = ''  # 번호판 인식 문자 정보를 담을 변수
@@ -311,15 +307,17 @@ while charsok == 0: # 번호판 글자로 예상되는 값이 나올 때까지 �
                 if c.isdigit():
                     has_digit = True  # 숫자가 하나라도 있는지
                 result_chars += c
-        plate_chars.append(result_chars) # 결과 result_chars를 plate_chars에 append
 
         for n in range(len(result_chars)):  # 번호판 형식이 맞는지 다시한번 검사 및 문자열 자르기
             if len(result_chars) < 7:  # 번호판 길이가 7자리(번호판의 최소 길이는 7자리)보다 짧다면
                 break
             elif result_chars[0].isdigit() == False:  # 첫문자가 문자라면(숫자가 아니라면) 자르기
                 result_chars = result_chars[1:result_chars.__len__()]
+
             elif result_chars[len(result_chars) - 1].isdigit() == False:  # 마지막 문자가 한글데이터라면(숫자가 아니라면) 자르기
                 result_chars = result_chars[0:(result_chars.__len__() - 1)]
+
+        plate_chars.append(result_chars)  # 결과 result_chars를 plate_chars에 append
 
         for j in range(len(result_chars)):  # 번호판의 배열이 나오는지를 검사 ex) 12가3456(7자리번호판) or 123가4567(8자리번호판)
             if len(result_chars) < 7:  # 결과길이가 7자리(번호판의 최소 길이는 7자리)보다 짧다면
@@ -371,6 +369,8 @@ while charsok == 0: # 번호판 글자로 예상되는 값이 나올 때까지 �
     plate_imgs = []
     plate_chars = []
 
+sec = nowtime - prevtime
+print("걸린시간 %0.5f" % sec)
 print("최종 값 : " + chars)
 
 img_out = src.copy()
@@ -378,4 +378,4 @@ img_out = src.copy()
 cv2.rectangle(img_out, pt1=(info['x'], info['y']), pt2=(info['x'] + info['w'], info['y'] + info['h']),
               color=(255, 0, 0), thickness=2)  # 원본 이미지에 번호판 영역 그리기
 
-cv2.imwrite('010.jpg', img_out)  # 원본 이미지에서 번호판 영역 그린 이미지
+cv2.imwrite('result.jpg', img_out)  # 원본 이미지에서 번호판 영역 그린 이미지
