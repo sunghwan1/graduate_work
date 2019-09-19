@@ -2,3 +2,4 @@ pip install opencv-python
 pip install "numpy<1.7"
 pip install tensorflow==1.8.0
 pip install pyqt5
+pip install matplotlib
